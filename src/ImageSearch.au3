@@ -20,7 +20,7 @@
 #include <WinAPIFiles.au3> ; for _WinAPI_Wow64EnableWow64FsRedirection
 
 #Region When running compiled script, Install needed DLLs if they don't exist yet
-If Not FileExists("ImageSearchDLLx32.dll") Then FileInstall("ImageSearchDLLx32.dll", "ImageSearchDLLx32.dll", 1);FileInstall ( "source", "dest" [, flag = 0] )
+If Not FileExists("ImageSearchDLLx86.dll") Then FileInstall("ImageSearchDLLx86.dll", "ImageSearchDLLx86.dll", 1);FileInstall ( "source", "dest" [, flag = 0] )
 If Not FileExists("ImageSearchDLLx64.dll") Then FileInstall("ImageSearchDLLx64.dll", "ImageSearchDLLx64.dll", 1)
 #EndRegion
 
@@ -32,7 +32,7 @@ Func _ImageSearchStartup()
 	$sOSArch = @OSArch ;Check if running on x64 or x32 Windows ;@OSArch Returns one of the following: "X86", "IA64", "X64" - this is the architecture type of the currently running operating system.
 	$sAutoItX64 = @AutoItX64 ;Check if using x64 AutoIt ;@AutoItX64 Returns 1 if the script is running under the native x64 version of AutoIt.
 	If $sOSArch = "X86" Or $sAutoItX64 = 0 Then	
-		$h_ImageSearchDLL = DllOpen("ImageSearchDLLx32.dll")
+		$h_ImageSearchDLL = DllOpen("ImageSearchDLLx86.dll")
 		If $h_ImageSearchDLL = -1 Then Return "DllOpen failure"
 	ElseIf $sOSArch = "X64" And $sAutoItX64 = 1 Then
 		$h_ImageSearchDLL = DllOpen("ImageSearchDLLx64.dll")
