@@ -26,6 +26,11 @@
 #define WIN32_LEAN_AND_MEAN		// Exclude rarely-used stuff from Windows headers
 // Windows Header Files:
 #include <windows.h>
+
+#define _CRT_SECURE_NO_WARNINGS
+#define _NO_CRT_STDIO_INLINE
+extern "C" { _declspec(selectany) int _fltused; };
+
 #include <stdio.h>
 #include <tchar.h>
 

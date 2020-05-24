@@ -4,19 +4,25 @@
 #include "stdafx.h"
 #include <windows.h>
 #include "util.h"
-#include <stdio.h>
-#include <stdlib.h>
-
 
 #ifdef _MANAGED
 #pragma managed(push, off)
 #endif
 
-BOOL APIENTRY DllMain( HMODULE hModule,
+extern void Answer_Clear(int final);
+
+extern "C"
+BOOL APIENTRY _DllMainCRTStartup( HMODULE hModule,
                        DWORD  ul_reason_for_call,
                        LPVOID lpReserved
 					 )
 {
+    switch (ul_reason_for_call)
+    {
+    case DLL_PROCESS_DETACH:
+        Answer_Clear(1);
+        break;
+    }
     return TRUE;
 }
 
@@ -24,7 +30,7 @@ BOOL APIENTRY DllMain( HMODULE hModule,
 #pragma managed(pop)
 #endif
 
-
+/*
 void _tmain()
 {
 	int z;
@@ -33,3 +39,4 @@ void _tmain()
 	answer = ImageSearch(0,0,1024,768,"c:\\pic.bmp");
 	return;
 }
+*/
