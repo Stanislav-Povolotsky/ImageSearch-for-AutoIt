@@ -90,7 +90,7 @@ char* Answer_Append(const char* s)
                 break;
             }
         }
-        memcpy(g_answer_cache + g_answer_cache_cur_len, s, slen);
+        memcpy(g_answer_cache + g_answer_cache_cur_len, s, slen + 1);
         g_answer_cache_cur_len = newlen - 1;
         break;
     }
