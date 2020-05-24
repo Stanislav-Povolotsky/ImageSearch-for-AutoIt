@@ -15,7 +15,7 @@ Original source code downloaded from:
 
 Examples
 -----
-'ImgSearch_demo' example:
+'ImgSearch_demo' example:\
 ![examples-ImgSearch_demo](https://user-images.githubusercontent.com/19610545/82743111-1bb50400-9d6f-11ea-9109-e10aa59832ae.gif)
 
 Build
