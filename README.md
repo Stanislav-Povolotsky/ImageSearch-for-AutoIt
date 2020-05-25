@@ -1,6 +1,6 @@
 ImageSearch 2020 (improoved version), AutoIt3 library
 --------------
-Search and compare byte for byte images and/or screen 
+Search images on the screen. 
 
 New features (comparing to the original library):
 * All-matches search - now it can find coordinates of all matching images, not only one!
