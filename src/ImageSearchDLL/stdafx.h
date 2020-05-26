@@ -28,8 +28,13 @@
 #include <windows.h>
 
 #define _CRT_SECURE_NO_WARNINGS
+
+#ifndef _DEBUG
 #define _NO_CRT_STDIO_INLINE
 extern "C" { _declspec(selectany) int _fltused; };
+#else
+#include <stdlib.h>
+#endif
 
 #include <stdio.h>
 #include <tchar.h>

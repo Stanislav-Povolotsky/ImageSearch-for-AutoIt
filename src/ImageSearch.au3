@@ -8,6 +8,8 @@
 ; Description:    ImageSearch v2020.05 library
 ;                 The set of functions to search images on the screen screen
 ;                 Require that the ImageSearchDLLx86.dll/ImageSearchDLLx64.dll be loadable
+; URL:            https://github.com/Stanislav-Povolotsky/ImageSearch-for-AutoIt/releases
+;
 ; Original source code downloaded from:
 ; - http://www.autoitscript.com/forum/topic/65748-image-search-library/?p=746436
 ; - https://macroforge.wordpress.com/2019/06/08/using-image-search-in-autoit/ 

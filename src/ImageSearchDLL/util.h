@@ -21,8 +21,8 @@ GNU General Public License for more details.
 #include "stdafx.h" // pre-compiled headers
 //#include "defines.h"
 
-HBITMAP LoadPicture(char *aFilespec, int aWidth, int aHeight, int &aImageType, int aIconNumber
-	, bool aUseGDIPlusIfAvailable);
+HBITMAP LoadPicture(char *aFilespec, int aWidth, int aHeight, 
+    int& aImageType, int aIconNumber, bool aUseGDIPlusIfAvailable);
 
 char* WINAPI ImageSearch(int aLeft, int aTop, int aRight, int aBottom, char *aImageFile);
 

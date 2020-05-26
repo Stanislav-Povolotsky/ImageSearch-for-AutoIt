@@ -11,11 +11,18 @@
 
 extern void Answer_Clear(int final);
 
+#ifdef _DEBUG
+BOOL _DllMain(HMODULE hModule,
+    DWORD  ul_reason_for_call,
+    LPVOID lpReserved
+)
+#else
 extern "C"
 BOOL APIENTRY _DllMainCRTStartup( HMODULE hModule,
                        DWORD  ul_reason_for_call,
                        LPVOID lpReserved
 					 )
+#endif
 {
     switch (ul_reason_for_call)
     {

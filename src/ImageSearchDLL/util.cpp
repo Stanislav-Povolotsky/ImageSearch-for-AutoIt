@@ -1,8 +1,11 @@
 /*
-AutoHotkey
 
-Copyright 2003-2007 Chris Mallett (support@autohotkey.com)
-DLL conversion 2008: kangkengkingkong@hotmail.com
+Authors:
+* AutoHotkey: (C) 2003-2007 Chris Mallett (support@autohotkey.com)
+* DLL conversion 2008: kangkengkingkong@hotmail.com
+* `ImageSearch` function author: Aurelian Maga.
+* ImageSearch 2015 mod author: styxa (macroforgex(at)gmail.com).
+* ImageSearch 2020 mod author: Stanislav Povolotsky (stas.dev[at]povolotsky.info).
 
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
@@ -13,6 +16,7 @@ This program is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of
 MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 GNU General Public License for more details.
+
 */
 
 #include "stdafx.h" // pre-compiled headers
@@ -21,11 +25,8 @@ GNU General Public License for more details.
 #include <windef.h>
 #include <windows.h>
 #include <winuser.h>
-//#include <malloc.h>
 #include <stdio.h>
-//#include <stdlib.h>
 #include <shellapi.h>
-
 
 #define CLR_DEFAULT 0x808080
 #define ToWideChar(source, dest, dest_size_in_wchars) MultiByteToWideChar(CP_ACP, 0, source, -1, dest, dest_size_in_wchars)
@@ -176,10 +177,26 @@ inline int ATOI(char *buf)
     return IsHex(buf) ? strtol(buf, NULL, 16) : atoi(buf); // atoi() has superior performance, so use it when possible.
 }
 
+inline __int64 ATOUI(char *buf)
+{
+    return IsHex(buf) ? strtoul(buf, NULL, 16) : strtoul(buf, NULL, 10);
+}
+
 inline __int64 ATOI64(char *buf)
 {
     return IsHex(buf) ? _strtoi64(buf, NULL, 16) : _strtoi64(buf, NULL, 10);
 }
+
+inline unsigned __int64 ATOUI64(char *buf)
+{
+    return IsHex(buf) ? _strtoui64(buf, NULL, 16) : _strtoui64(buf, NULL, 10);
+}
+
+#ifdef _WIN64
+#define ATOPTR(buf) ((PVOID)(ULONG_PTR)(ATOUI64(buf)))
+#else
+#define ATOPTR(buf) ((PVOID)(ULONG_PTR)(ATOUI(buf)))
+#endif
 
 void strlcpy(char *aDst, const char *aSrc, size_t aDstSize) // Non-inline because it benches slightly faster that way.
 // Caller must ensure that aDstSize is greater than 0.
@@ -316,8 +333,8 @@ end:
     return image_pixel;
 }
 
-HBITMAP LoadPicture(char *aFilespec, int aWidth, int aHeight, int &aImageType, int aIconNumber
-    , bool aUseGDIPlusIfAvailable)
+HBITMAP LoadPicture(char *aFilespec, int aWidth, int aHeight, 
+    int &aImageType, int aIconNumber, bool aUseGDIPlusIfAvailable)
     // Returns NULL on failure.
     // If aIconNumber > 0, an HICON or HCURSOR is returned (both should be interchangeable), never an HBITMAP.
     // However, aIconNumber==1 is treated as a special icon upon which LoadImage is given preference over ExtractIcon
@@ -345,6 +362,8 @@ HBITMAP LoadPicture(char *aFilespec, int aWidth, int aHeight, int &aImageType, i
     if (file_ext)
         ++file_ext;
 
+    WCHAR aFilespecW[MAX_PATH];
+    ToWideChar(aFilespec, aFilespecW, MAX_PATH); // Dest. size is in wchars, not bytes.
 
     // v1.0.43.07: If aIconNumber is zero, caller didn't specify whether it wanted an icon or bitmap.  Thus,
     // there must be some kind of detection for whether ExtractIcon is needed instead of GDIPlus/OleLoadPicture.
@@ -386,7 +405,7 @@ HBITMAP LoadPicture(char *aFilespec, int aWidth, int aHeight, int &aImageType, i
     if (ExtractIcon_was_used)
     {
         aImageType = IMAGE_ICON;
-        hbitmap = (HBITMAP)ExtractIcon(g_hInstance, aFilespec, aIconNumber > 0 ? aIconNumber - 1 : 0);
+        hbitmap = (HBITMAP)ExtractIconW(g_hInstance, aFilespecW, aIconNumber > 0 ? aIconNumber - 1 : 0);
         // Above: Although it isn't well documented at MSDN, apparently both ExtractIcon() and LoadIcon()
         // scale the icon to the system's large-icon size (usually 32x32) regardless of the actual size of
         // the icon inside the file.  For this reason, callers should call us in a way that allows us to
@@ -463,7 +482,7 @@ HBITMAP LoadPicture(char *aFilespec, int aWidth, int aHeight, int &aImageType, i
         //   FileSelectFile, outputvar
         //   return
         //printf("\nloading image %s",(LPCTSTR)aFilespec);
-        if (hbitmap = (HBITMAP)LoadImage(NULL, aFilespec, aImageType, desired_width, desired_height
+        if (hbitmap = (HBITMAP)LoadImageW(NULL, aFilespecW, aImageType, desired_width, desired_height
             , LR_LOADFROMFILE | LR_CREATEDIBSECTION))
         {
             // The above might have loaded an HICON vs. an HBITMAP (it has been confirmed that LoadImage()
@@ -479,7 +498,7 @@ HBITMAP LoadPicture(char *aFilespec, int aWidth, int aHeight, int &aImageType, i
         // v1.0.40.10: Abort if file doesn't exist so that GDIPlus isn't even attempted. This is done because
         // loading GDIPlus apparently disrupts the color palette of certain games, at least old ones that use
         // DirectDraw in 256-color depth.
-        else if (GetFileAttributes(aFilespec) == 0xFFFFFFFF) // For simplicity, we don't check if it's a directory vs. file, since that should be too rare.
+        else if (GetFileAttributesW(aFilespecW) == 0xFFFFFFFF) // For simplicity, we don't check if it's a directory vs. file, since that should be too rare.
             return NULL;
         // v1.0.43.07: Also abort if caller wanted an HICON (not an HBITMAP), since the other methods below
         // can't yield an HICON.
@@ -487,7 +506,7 @@ HBITMAP LoadPicture(char *aFilespec, int aWidth, int aHeight, int &aImageType, i
         {
             // UPDATE for v1.0.44: Attempt ExtractIcon in case its some extension that's
             // was recognized as an icon container (such as AutoHotkeySC.bin) and thus wasn't handled higher above.
-            hbitmap = (HBITMAP)ExtractIcon(g_hInstance, aFilespec, aIconNumber - 1);
+            hbitmap = (HBITMAP)ExtractIconW(g_hInstance, aFilespecW, aIconNumber - 1);
             if (hbitmap < (HBITMAP)2) // i.e. it's NULL or 1. Return value of 1 means "incorrect file type".
                 return NULL;
             ExtractIcon_was_used = true;
@@ -536,9 +555,7 @@ HBITMAP LoadPicture(char *aFilespec, int aWidth, int aHeight, int &aImageType, i
             Gdiplus::GpBitmap *pgdi_bitmap;
             if (DynGdiplusStartup && DynGdiplusStartup(&token, &gdi_input, NULL) == Gdiplus::Ok)
             {
-                WCHAR filespec_wide[MAX_PATH];
-                ToWideChar(aFilespec, filespec_wide, MAX_PATH); // Dest. size is in wchars, not bytes.
-                if (DynGdipCreateBitmapFromFile(filespec_wide, &pgdi_bitmap) == Gdiplus::Ok)
+                if (DynGdipCreateBitmapFromFile(aFilespecW, &pgdi_bitmap) == Gdiplus::Ok)
                 {
                     if (DynGdipCreateHBITMAPFromBitmap(pgdi_bitmap, &hbitmap, CLR_DEFAULT) != Gdiplus::Ok)
                         hbitmap = NULL; // Set to NULL to be sure.
@@ -553,7 +570,7 @@ HBITMAP LoadPicture(char *aFilespec, int aWidth, int aHeight, int &aImageType, i
         else // Using old picture loading method.
         {
             // Based on code sample at http://www.codeguru.com/Cpp/G-M/bitmap/article.php/c4935/
-            HANDLE hfile = CreateFile(aFilespec, GENERIC_READ, 0, NULL, OPEN_EXISTING, 0, NULL);
+            HANDLE hfile = CreateFileW(aFilespecW, GENERIC_READ, 0, NULL, OPEN_EXISTING, 0, NULL);
             if (hfile == INVALID_HANDLE_VALUE)
                 return NULL;
             DWORD size = GetFileSize(hfile, NULL);
@@ -651,7 +668,7 @@ HBITMAP LoadPicture(char *aFilespec, int aWidth, int aHeight, int &aImageType, i
                 // greater than 90.  Since I don't know whether this affects all versions of Windows 9x, and
                 // all animated cursors, it seems best just to document it here and in the help file rather
                 // than limiting the dimensions of .ani (and maybe .cur) files for certain operating systems.
-                return (HBITMAP)LoadImage(NULL, aFilespec, aImageType, aWidth, aHeight, LR_LOADFROMFILE);
+                return (HBITMAP)LoadImageW(NULL, aFilespecW, aImageType, aWidth, aHeight, LR_LOADFROMFILE);
             }
         }
     }
@@ -773,8 +790,6 @@ HBITMAP IconToBitmap(HICON ahIcon, bool aDestroyIcon)
     return hbitmap;
 }
 
-
-
 int WINAPI ImageTest(int a)
 {
     return a + a;
@@ -785,13 +800,11 @@ char* IntAddResult(int i, int aLeft, int aTop, RECT* pRect, int screen_width, in
     char answer[50];
     int locx = (aLeft + i % screen_width) - pRect->left;
     int locy = (aTop + i / screen_width) - pRect->top;
-    sprintf_s(answer, "%s%d|%d|%d|%d", g_answer_cache_cur_len ? "|" : "1|", locx, locy, image_width, image_height);
+    sprintf_s(answer, "%s|%d|%d|%d|%d", g_answer_cache_cur_len ? "" : "1", locx, locy, image_width, image_height);
     return Answer_Append(answer);
 }
 
-// ResultType Line::ImageSearch(int aLeft, int aTop, int aRight, int aBottom, char *aImageFile)
 char* WINAPI ImageSearch(int aLeft, int aTop, int aRight, int aBottom, char *aImageFile)
-// Author: ImageSearch was created by Aurelian Maga.
 {
     // Many of the following sections are similar to those in PixelSearch(), so they should be
     // maintained together.
@@ -827,6 +840,17 @@ char* WINAPI ImageSearch(int aLeft, int aTop, int aRight, int aBottom, char *aIm
     int n_total_found = 0;
     int b_multi_results = 0;
     HWND hWnd = HWND_DESKTOP;
+    HBITMAP hUserSpecifiedBitmap = 0;
+    HBITMAP hUserSpecifiedDesktopBitmap = 0;
+    bool is_success = false;
+    HDC hdc = NULL;
+    HDC sdc = NULL;
+    HDC tmpdc = NULL;
+    HBITMAP hbitmap_screen = NULL;
+    LPCOLORREF image_pixel = NULL, screen_pixel = NULL, image_mask = NULL;
+    HGDIOBJ sdc_orig_select = NULL;
+    HGDIOBJ tmpdc_orig_select = NULL;
+    bool found = false; // Must init here for use by "goto end".
 
     Answer_Clear();
 
@@ -854,10 +878,20 @@ char* WINAPI ImageSearch(int aLeft, int aTop, int aRight, int aBottom, char *aIm
                 cp += 4;  // Now it's the character after the word.
                 icon_number = ATOI(cp); // LoadPicture() correctly handles any negative value.
             }
-            if (!_strnicmp(cp, "Window", 4))
+            else if (!_strnicmp(cp, "Window", 6))
             {
                 cp += 6;  // Now it's the character after the word.
-                hWnd = (HWND)(ULONG_PTR)ATOI64(cp); 
+                hWnd = (HWND)ATOPTR(cp);
+            }
+            else if (!_strnicmp(cp, "Img", 3)) // Already loaded image(HBITMAP) to find
+            {
+                cp += 3;  // Now it's the character after the word.
+                hUserSpecifiedBitmap = (HBITMAP)ATOPTR(cp);
+            }
+            else if (!_strnicmp(cp, "DesktopImg", 10)) // Already captured desktop image(HBITMAP)
+            {
+                cp += 10;  // Now it's the character after the word.
+                hUserSpecifiedDesktopBitmap = (HBITMAP)ATOPTR(cp);
             }
             else if (!_strnicmp(cp, "Trans", 5))
             {
@@ -892,7 +926,7 @@ char* WINAPI ImageSearch(int aLeft, int aTop, int aRight, int aBottom, char *aIm
             }
         } // switch()
         if (!(cp = StrChrAny(cp, " \t"))) // Find the first space or tab after the option.
-            return "0"; //new
+            goto error_end;
         //	return OK; // Bad option/format.  Let ErrorLevel tell the story.
         // Now it's the space or tab (if there is one) after the option letter.  Advance by exactly one character
         // because only one space or tab is considered the delimiter.  Any others are considered to be part of the
@@ -914,8 +948,9 @@ char* WINAPI ImageSearch(int aLeft, int aTop, int aRight, int aBottom, char *aIm
     // color of whatever is behind it; thus screen pixel color won't match image's pixel color).
     // So currently, only BMP and GIF seem to work reliably, though some of the other GDIPlus-supported
     // formats might work too.
-    int image_type;
-    HBITMAP hbitmap_image = LoadPicture(aImageFile, width, height, image_type, icon_number, false);
+    int image_type = IMAGE_BITMAP;
+    HBITMAP hbitmap_image = hUserSpecifiedBitmap ? hUserSpecifiedBitmap :
+        LoadPicture(aImageFile, width, height, image_type, icon_number, false);
     // The comment marked OBSOLETE below is no longer true because the elimination of the high-byte via
     // 0x00FFFFFF seems to have fixed it.  But "true" is still not passed because that should increase
     // consistency when GIF/BMP/ICO files are used by a script on both Win9x and other OSs (since the
@@ -924,25 +959,12 @@ char* WINAPI ImageSearch(int aLeft, int aTop, int aRight, int aBottom, char *aIm
     // by the search.  In other words, nothing works.  Obsolete comment: Pass "true" so that an attempt
     // will be made to load icons as bitmaps if GDIPlus is available.
     if (!hbitmap_image)
-        return "0"; // new
-    //	return OK; // Let ErrorLevel tell the story.
+        goto error_end;
 
-    HDC hdc = GetDC(hWnd);
-    if (!hdc)
-    {
-        DeleteObject(hbitmap_image);
-        return "0"; // new
-        // return OK; // Let ErrorLevel tell the story.
+    hdc = GetDC(hWnd);
+    if (!hdc) {
+        goto error_end;
     }
-
-    // From this point on, "goto end" will assume hdc and hbitmap_image are non-NULL, but that the below
-    // might still be NULL.  Therefore, all of the following must be initialized so that the "end"
-    // label can detect them:
-    HDC sdc = NULL;
-    HBITMAP hbitmap_screen = NULL;
-    LPCOLORREF image_pixel = NULL, screen_pixel = NULL, image_mask = NULL;
-    HGDIOBJ sdc_orig_select = NULL;
-    bool found = false; // Must init here for use by "goto end".
 
     bool image_is_16bit;
     LONG image_width, image_height;
@@ -968,30 +990,45 @@ char* WINAPI ImageSearch(int aLeft, int aTop, int aRight, int aBottom, char *aIm
             DeleteObject(ii.hbmMask);
         }
         if (!(hbitmap_image = IconToBitmap((HICON)hbitmap_image, true)))
-            return "0"; //new
-        //	return OK; // Let ErrorLevel tell the story.
+            goto error_end;
     }
 
     if (!(image_pixel = getbits(hbitmap_image, hdc, image_width, image_height, image_is_16bit)))
-        goto end;
+        goto error_end;
 
     // Create an empty bitmap to hold all the pixels currently visible on the screen that lie within the search area:
     int search_width = aRight - aLeft + 1;
     int search_height = aBottom - aTop + 1;
-    if (!(sdc = CreateCompatibleDC(hdc)) || !(hbitmap_screen = CreateCompatibleBitmap(hdc, search_width, search_height)))
-        goto end;
+    if (!(sdc = CreateCompatibleDC(hdc)))
+        goto error_end;
+
+    if (!(hbitmap_screen = CreateCompatibleBitmap(hdc, search_width, search_height)))
+        goto error_end;
 
     if (!(sdc_orig_select = SelectObject(sdc, hbitmap_screen)))
-        goto end;
+        goto error_end;
 
-    // Copy the pixels in the search-area of the screen into the DC to be searched:
-    if (!(BitBlt(sdc, 0, 0, search_width, search_height, hdc, aLeft, aTop, SRCCOPY)))
-        goto end;
+    if (!hUserSpecifiedDesktopBitmap)
+    {
+        // Copy the pixels in the search-area of the screen into the DC to be searched:
+        if (!(BitBlt(sdc, 0, 0, search_width, search_height, hdc, aLeft, aTop, SRCCOPY)))
+            goto error_end;
+    }
+    else
+    {
+        if (!(tmpdc = CreateCompatibleDC(hdc)))
+            goto error_end;
+        if (!(tmpdc_orig_select = SelectObject(tmpdc, hUserSpecifiedDesktopBitmap)))
+            goto error_end;
+        // Copy the pixels in the search-area of user specified 'screen' into the DC to be searched:
+        if (!(BitBlt(sdc, 0, 0, search_width, search_height, tmpdc, aLeft, aTop, SRCCOPY)))
+            goto error_end;
+    }
 
     LONG screen_width, screen_height;
     bool screen_is_16bit;
     if (!(screen_pixel = getbits(hbitmap_screen, sdc, screen_width, screen_height, screen_is_16bit)))
-        goto end;
+        goto error_end;
 
     LONG image_pixel_count = image_width * image_height;
     LONG screen_pixel_count = screen_width * screen_height;
@@ -1131,8 +1168,8 @@ char* WINAPI ImageSearch(int aLeft, int aTop, int aRight, int aBottom, char *aIm
                     search_red = GetBValue(image_pixel[j]);
                     search_green = GetGValue(image_pixel[j]);
                     search_blue = GetRValue(image_pixel[j]);
-                    SET_COLOR_RANGE
-                        red = GetBValue(screen_pixel[k]);
+                    SET_COLOR_RANGE;
+                    red = GetBValue(screen_pixel[k]);
                     green = GetGValue(screen_pixel[k]);
                     blue = GetRValue(screen_pixel[k]);
 
@@ -1162,19 +1199,32 @@ char* WINAPI ImageSearch(int aLeft, int aTop, int aRight, int aBottom, char *aIm
         }
     }
 
-    //if (!found) // Must override ErrorLevel to its new value prior to the label below.
-    //	g_ErrorLevel->Assign(ERRORLEVEL_ERROR); // "1" indicates search completed okay, but didn't find it.
+    is_success = true;
+    goto good_end;
 
-end:
+error_end:
+    is_success = false;
+
+good_end:
     // If found==false when execution reaches here, ErrorLevel is already set to the right value, so just
     // clean up then return.
-    ReleaseDC(NULL, hdc);
-    DeleteObject(hbitmap_image);
+    if (hdc) {
+        ReleaseDC(NULL, hdc);
+    }
+    if (hUserSpecifiedBitmap != hbitmap_image && hbitmap_image) {
+        DeleteObject(hbitmap_image);
+    }
     if (sdc)
     {
         if (sdc_orig_select) // i.e. the original call to SelectObject() didn't fail.
             SelectObject(sdc, sdc_orig_select); // Probably necessary to prevent memory leak.
         DeleteDC(sdc);
+    }
+    if (tmpdc)
+    {
+        if (tmpdc_orig_select) 
+            SelectObject(tmpdc, tmpdc_orig_select); 
+        DeleteDC(tmpdc);
     }
     if (hbitmap_screen)
         DeleteObject(hbitmap_screen);
@@ -1190,4 +1240,3 @@ end:
     }
     return "0";
 }
-

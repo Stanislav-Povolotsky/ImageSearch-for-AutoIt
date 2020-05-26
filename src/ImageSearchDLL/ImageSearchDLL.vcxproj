@@ -74,7 +74,7 @@
     <OutDir>$(ProjectDir)..\..\bin\$(Platform)-$(Configuration)\</OutDir>
     <IntDir>$(ProjectDir)..\..\bin\intermediate\$(Configuration)\$(Platform)\$(ProjectName)\</IntDir>
     <LinkIncremental>true</LinkIncremental>
-    <TargetName>$(ProjectName)x32</TargetName>
+    <TargetName>$(ProjectName)x86</TargetName>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <LinkIncremental>true</LinkIncremental>
